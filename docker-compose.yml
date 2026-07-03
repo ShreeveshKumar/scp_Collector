@@ -1,0 +1,31 @@
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  agent:
+    build: .
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      # Uses MONGODB_URI from .env if set (e.g. your Atlas string); otherwise
+      # falls back to the bundled mongo service below.
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-startup_intel}
+      MONGODB_COLLECTION: ${MONGODB_COLLECTION:-startups}
+      SIA_LOG_LEVEL: ${SIA_LOG_LEVEL:-info}
+    # Internal scheduler: one pass every 35 minutes (2100s — a true 35-min
+    # interval). For production prefer an external scheduler running `sia --once`.
+    command: ["--interval", "2100"]
+
+volumes:
+  mongodata:

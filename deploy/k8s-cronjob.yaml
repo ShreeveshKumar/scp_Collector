@@ -1,0 +1,46 @@
+# Scheduled discovery as a Kubernetes CronJob (every 35 minutes).
+#   kubectl create secret generic sia-secrets \
+#     --from-literal=MONGODB_URI='mongodb+srv://user:pass@cluster0.xxxxx.mongodb.net/'
+#   kubectl apply -f deploy/k8s-cronjob.yaml
+# NOTE: cron fires at :00 and :35 each hour (it can't do a true 35-min interval).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: startup-intel-agent
+  labels:
+    app: startup-intel-agent
+spec:
+  schedule: "*/35 * * * *"        # :00 and :35 each hour (cron's closest to 35 min)
+  concurrencyPolicy: Forbid       # never overlap runs
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 900
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: sia
+              image: ghcr.io/OWNER/REPO:latest   # replace OWNER/REPO
+              args: ["--once"]
+              env:
+                - name: MONGODB_URI
+                  valueFrom:
+                    secretKeyRef:
+                      name: sia-secrets
+                      key: MONGODB_URI
+                - name: MONGODB_DATABASE
+                  value: "startup_intel"
+                - name: MONGODB_COLLECTION
+                  value: "startups"
+                - name: SIA_LOG_LEVEL
+                  value: "info"
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "256Mi"

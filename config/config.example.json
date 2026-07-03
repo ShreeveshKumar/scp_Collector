@@ -1,0 +1,11 @@
+{
+  "mongodb_uri": "mongodb://localhost:27017",
+  "mongodb_database": "startup_intel",
+  "mongodb_collection": "startups",
+  "hn_tags": "show_hn",
+  "hn_hits": 50,
+  "http_user_agent": "startup-intel-agent/1.0 (+https://github.com/you/startup-intel)",
+  "http_timeout_ms": 15000,
+  "enable_tech_detection": true,
+  "log_level": "info"
+}

@@ -1,0 +1,4 @@
+# Plain-cron deployment. Install with:  crontab deploy/crontab.example
+# Runs a discovery pass at :00 and :35 of every hour (cron's closest to a
+# 35-minute cadence — it can't express a true every-35-minutes interval).
+*/35 * * * * MONGODB_URI='mongodb://localhost:27017' MONGODB_DATABASE='startup_intel' /usr/local/bin/sia --once >> /var/log/sia.log 2>&1

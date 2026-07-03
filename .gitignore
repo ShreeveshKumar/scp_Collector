@@ -1,0 +1,21 @@
+# Build
+build/
+cmake-build-*/
+*.o
+*.obj
+*.a
+*.so
+sia
+
+# Env / secrets — never commit
+.env
+config/config.json
+
+# Local agent framework module (kept private, not pushed)
+.claude/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+compile_commands.json

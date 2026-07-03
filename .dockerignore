@@ -1,0 +1,10 @@
+build/
+cmake-build-*/
+.git/
+.github/
+deploy/
+docs/
+*.md
+.env
+.env.example
+.DS_Store

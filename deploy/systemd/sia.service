@@ -1,0 +1,15 @@
+[Unit]
+Description=Startup Intelligence Agent (single discovery pass)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Provide MONGODB_URI (and optional MONGODB_*/SIA_* vars) via this env file.
+EnvironmentFile=/etc/sia/sia.env
+ExecStart=/usr/local/bin/sia --once
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true

@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the Startup Intelligence Agent every 35 minutes
+
+[Timer]
+# True 35-minute interval (measured from the end of the last run), unlike cron
+# which cannot express every-35-minutes cleanly.
+OnBootSec=5min
+OnUnitActiveSec=35min
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
