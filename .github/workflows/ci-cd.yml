@@ -1,0 +1,70 @@
+name: Startup Intelligence CI/CD
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  schedule:
+    - cron: '*/35 * * * *'   # fires at :00 and :35 each hour (cron's closest to every-35-min)
+  workflow_dispatch:
+
+jobs:
+  run-job:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      # ── MongoDB ────────────────────────────────────────────────────────────
+      # Simplest: set MONGODB_URI (a full Atlas string) and ignore the parts.
+      # Otherwise provide the components and a URI is assembled by the app.
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}   # optional — overrides the parts below
+      MONGODB_SCHEME: ${{ secrets.MONGODB_SCHEME || 'mongodb+srv' }}
+      MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+      MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+      MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+      MONGODB_OPTIONS: ${{ secrets.MONGODB_OPTIONS || 'retryWrites=true&w=majority' }}
+      MONGODB_DATABASE: ${{ vars.MONGODB_DATABASE || 'startup_intel' }}
+      MONGODB_COLLECTION: ${{ vars.MONGODB_COLLECTION || 'startups' }}
+
+      # ── Source + HTTP tuning (safe defaults; override via repo secrets/vars) ─
+      SIA_HN_TAGS: ${{ vars.SIA_HN_TAGS || 'show_hn' }}
+      SIA_HN_HITS: ${{ vars.SIA_HN_HITS || '50' }}
+      SIA_HTTP_USER_AGENT: ${{ secrets.SIA_HTTP_USER_AGENT || 'startup-intel-agent/1.0 (+https://github.com)' }}
+      SIA_HTTP_TIMEOUT_MS: ${{ vars.SIA_HTTP_TIMEOUT_MS || '15000' }}
+      SIA_ENABLE_TECH_DETECTION: ${{ vars.SIA_ENABLE_TECH_DETECTION || 'true' }}
+      SIA_LOG_LEVEL: ${{ vars.SIA_LOG_LEVEL || 'info' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config cppcheck \
+            libcurl4-openssl-dev libmongocxx-dev libbsoncxx-dev nlohmann-json3-dev
+
+      - name: Lint with cppcheck
+        run: |
+          # Strict pass — fail the build on genuine errors only.
+          cppcheck --error-exitcode=1 --std=c++20 --language=c++ \
+            --suppress=missingInclude --suppress=missingIncludeSystem \
+            -I include src
+          # Informational pass — never fails the build (mirrors flake8 --exit-zero).
+          cppcheck --enable=all --inconclusive --std=c++20 --language=c++ \
+            --suppress=missingInclude --suppress=missingIncludeSystem \
+            -I include src || true
+
+      - name: Configure & build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Run startup intelligence collector
+        run: |
+          if [ -z "$MONGODB_URI" ] && [ -z "$MONGODB_USERNAME" ] && [ -z "$MONGODB_HOST" ]; then
+            echo "::warning::No MongoDB config (set MONGODB_URI or the MONGODB_* parts as secrets); skipping run."
+            exit 0
+          fi
+          ./build/sia --once
