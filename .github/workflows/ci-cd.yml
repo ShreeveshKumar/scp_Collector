@@ -9,8 +9,6 @@ on:
 
 jobs:
   run-job:
-    # Ubuntu 24.04 "noble" removed the mongo-cxx-driver packages
-    # (libmongocxx-dev / libbsoncxx-dev). 22.04 "jammy" ships them in universe.
     runs-on: ubuntu-22.04
     environment: production
     env:
@@ -34,15 +32,47 @@ jobs:
       SIA_ENABLE_TECH_DETECTION: ${{ vars.SIA_ENABLE_TECH_DETECTION || 'true' }}
       SIA_LOG_LEVEL: ${{ vars.SIA_LOG_LEVEL || 'info' }}
 
+      # Version of the MongoDB C++ driver we build from source (Ubuntu does not
+      # package it — only the C driver). r3.11+ auto-downloads the C driver.
+      MONGOCXX_VERSION: r3.11.0
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake pkg-config cppcheck \
-            libcurl4-openssl-dev libmongocxx-dev libbsoncxx-dev nlohmann-json3-dev
+            build-essential cmake git ca-certificates pkg-config cppcheck \
+            libssl-dev libsasl2-dev zlib1g-dev \
+            libcurl4-openssl-dev nlohmann-json3-dev
+
+      # The C++ driver is not in any Ubuntu repo, so we build it from source and
+      # cache the install — it only rebuilds when MONGOCXX_VERSION changes.
+      - name: Cache MongoDB C++ driver
+        id: cache-mongocxx
+        uses: actions/cache@v4
+        with:
+          path: ~/mongocxx
+          key: mongocxx-${{ env.MONGOCXX_VERSION }}-ubuntu22.04
+
+      - name: Build MongoDB C++ driver from source
+        if: steps.cache-mongocxx.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$MONGOCXX_VERSION" \
+            https://github.com/mongodb/mongo-cxx-driver.git /tmp/mongo-cxx-driver
+          cmake -S /tmp/mongo-cxx-driver -B /tmp/mongo-cxx-driver/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$HOME/mongocxx" \
+            -DMONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX=OFF \
+            -DENABLE_TESTS=OFF
+          cmake --build /tmp/mongo-cxx-driver/build --parallel
+          cmake --install /tmp/mongo-cxx-driver/build
+
+      - name: Export driver paths
+        run: |
+          echo "CMAKE_PREFIX_PATH=$HOME/mongocxx" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$HOME/mongocxx/lib:$HOME/mongocxx/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Lint with cppcheck
         run: |
@@ -57,7 +87,8 @@ jobs:
 
       - name: Configure & build
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$HOME/mongocxx"
           cmake --build build --parallel
 
       - name: Unit tests
