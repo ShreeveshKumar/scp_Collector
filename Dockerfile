@@ -1,5 +1,7 @@
 # ---- Build stage ----------------------------------------------------------
-FROM ubuntu:24.04 AS build
+# Ubuntu 22.04 (jammy) — it packages the mongo-cxx-driver (libmongocxx-dev /
+# libbsoncxx-dev); 24.04 (noble) removed them.
+FROM ubuntu:22.04 AS build
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential cmake pkg-config git ca-certificates \
@@ -16,7 +18,7 @@ RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
     && ctest --test-dir build --output-on-failure
 
 # ---- Runtime stage --------------------------------------------------------
-FROM ubuntu:24.04 AS runtime
+FROM ubuntu:22.04 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 # Runtime libs only. ca-certificates is required for TLS to MongoDB Atlas.
 RUN apt-get update && apt-get install -y --no-install-recommends \

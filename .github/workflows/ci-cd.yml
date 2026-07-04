@@ -9,7 +9,9 @@ on:
 
 jobs:
   run-job:
-    runs-on: ubuntu-latest
+    # Ubuntu 24.04 "noble" removed the mongo-cxx-driver packages
+    # (libmongocxx-dev / libbsoncxx-dev). 22.04 "jammy" ships them in universe.
+    runs-on: ubuntu-22.04
     environment: production
     env:
       # ── MongoDB ────────────────────────────────────────────────────────────
